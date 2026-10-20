@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.cache/
+session.json
+.env
+data/
+*.log
+.streamlit/secrets.toml
+fix_app.py
