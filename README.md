@@ -73,6 +73,8 @@ The app is built with Streamlit, so the whole system runs locally in a browser w
 - **Fast Rule-Based Mode**: skips transformer models when downloads are slow or unavailable
 
 ### 📊 Interactive Dashboard
+<img width="931" height="100" alt="image" src="https://github.com/user-attachments/assets/52916e6f-3961-41cd-8dd4-6eb3cf2f7a9c" />
+
 - Brand Health Score (out of 100) and a 7-card KPI row
 - Sentiment pie chart, emotion bar chart, toxicity gauge, aspect-based stacked bar chart
 - Executive summary generated automatically from the analysis
