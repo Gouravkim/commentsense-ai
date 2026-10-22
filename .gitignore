@@ -8,3 +8,4 @@ data/
 *.log
 .streamlit/secrets.toml
 fix_app.py
+data/poll_votes.json

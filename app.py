@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 
@@ -15,6 +16,7 @@ from src.metrics import calculate_brand_health, get_risk_status
 from src.providers import load_demo
 from src.report import export_csv, export_json, export_pdf_report
 from src.summary import generate_executive_summary
+from src.voting import compute_social_ballot, cast_vote, load_poll_votes
 
 import streamlit as st
 def theme_fig(fig, height=380):
@@ -29,8 +31,8 @@ def theme_fig(fig, height=380):
     )
     return fig
 st.set_page_config(
-    page_title="CommentSense AI",
-    page_icon="🧠",
+    page_title="AI-Based Social Voting System",
+    page_icon="🗳️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -181,8 +183,9 @@ def store_and_analyze(comments: list, source: str, metadata: dict | None = None)
 # -----------------------------
 # Header
 # -----------------------------
-st.title("🧠 CommentSense AI")
-st.caption("Instagram comments ko sentiment, toxicity, emotion, aspect insights aur brand intelligence mein convert karo.")
+st.title("🗳️ AI-Based Social Voting System")
+st.caption("Powered by CommentSense AI engine — sentiment • toxicity • emotion • aspects")
+st.caption("Public social comments ko AI-powered FOR / AGAINST / ABSTAIN votes mein convert karke transparent, manipulation-proof voting results nikalne wala intelligent system.")
 
 # -----------------------------
 # Inputs
@@ -347,12 +350,25 @@ st.caption(
 )
 
 # Tabs
-tab_insights, tab_comments, tab_report = st.tabs(["📊 Insights", "💬 Comment Explorer", "📄 Report"])
+tab_insights, tab_vote, tab_comments, tab_report = st.tabs(["📊 Insights", "🗳️ Social Voting", "💬 Comment Explorer", "📄 Report"])
 
 # -----------------------------
 # Insights tab
 # -----------------------------
 with tab_insights:
+
+    # Dark-theme + uniform height helper
+    def theme_fig(fig, height=380):
+        fig.update_layout(
+            height=height,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font={"color": "#FAFAFA", "size": 13},
+            legend={"font": {"color": "#FAFAFA"}},
+            margin={"t": 50, "b": 40, "l": 40, "r": 20},
+        )
+        return fig
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -365,15 +381,21 @@ with tab_insights:
             .reset_index()
         )
         sentiment_counts.columns = ["Sentiment", "Count"]
+        sentiment_counts["Sentiment"] = sentiment_counts["Sentiment"].str.title()
 
-        fig_sentiment = px.pie(
+        fig1 = px.pie(
             sentiment_counts,
             names="Sentiment",
             values="Count",
             title="Sentiment Distribution",
-            color_discrete_sequence=["#22c55e", "#94a3b8", "#ef4444"],
+            color="Sentiment",
+            color_discrete_map={
+                "Positive": "#22c55e",
+                "Neutral": "#94a3b8",
+                "Negative": "#ef4444",
+            },
         )
-        st.plotly_chart(fig_sentiment, width="stretch")
+        st.plotly_chart(theme_fig(fig1), width="stretch")
 
     with col2:
         emotion_order = ["joy", "neutral", "anger", "sadness", "surprise", "fear", "disgust"]
@@ -385,15 +407,25 @@ with tab_insights:
             .reset_index()
         )
         emotion_counts.columns = ["Emotion", "Count"]
+        emotion_counts["Emotion"] = emotion_counts["Emotion"].str.title()
 
-        fig_emotion = px.bar(
+        fig2 = px.bar(
             emotion_counts,
             x="Emotion",
             y="Count",
             title="Emotion Breakdown",
             color="Emotion",
+            color_discrete_map={
+                "Joy": "#facc15",
+                "Neutral": "#94a3b8",
+                "Anger": "#ef4444",
+                "Sadness": "#3b82f6",
+                "Surprise": "#a78bfa",
+                "Fear": "#14b8a6",
+                "Disgust": "#f97316",
+            },
         )
-        st.plotly_chart(fig_emotion, width="stretch")
+        st.plotly_chart(theme_fig(fig2), width="stretch")
 
     col3, col4 = st.columns(2)
 
@@ -402,25 +434,29 @@ with tab_insights:
             go.Indicator(
                 mode="gauge+number",
                 value=toxic_pct,
-                title={"text": "Toxic Risk %"},
+                number={"font": {"size": 42, "color": "#FAFAFA"}},
+                title={"text": "Toxic Risk %", "font": {"size": 16, "color": "#FAFAFA"}},
                 gauge={
-                    "axis": {"range": [0, 100]},
-                    "bar": {"color": "#ef4444"},
+                    "axis": {"range": [0, 100], "tickcolor": "#FAFAFA", "tickfont": {"color": "#FAFAFA"}},
+                    "bar": {"color": "#ef4444", "thickness": 0.35},
+                    "bgcolor": "rgba(255,255,255,0.06)",
+                    "borderwidth": 1,
+                    "bordercolor": "rgba(255,255,255,0.2)",
                     "steps": [
-                        {"range": [0, 5], "color": "#dcfce7"},
-                        {"range": [5, 10], "color": "#fef9c3"},
-                        {"range": [10, 20], "color": "#ffedd5"},
-                        {"range": [20, 100], "color": "#fee2e2"},
+                        {"range": [0, 5], "color": "rgba(34,197,94,0.25)"},
+                        {"range": [5, 10], "color": "rgba(250,204,21,0.25)"},
+                        {"range": [10, 20], "color": "rgba(249,115,22,0.30)"},
+                        {"range": [20, 100], "color": "rgba(239,68,68,0.35)"},
                     ],
                     "threshold": {
-                        "line": {"color": "red", "width": 2},
-                        "thickness": 0.75,
+                        "line": {"color": "#FAFAFA", "width": 3},
+                        "thickness": 0.8,
                         "value": 20,
                     },
                 },
             )
         )
-        st.plotly_chart(fig_gauge, width="stretch")
+        st.plotly_chart(theme_fig(fig_gauge), width="stretch")
 
     with col4:
         aspect_rows = []
@@ -446,6 +482,7 @@ with tab_insights:
                 .size()
                 .reset_index(name="Count")
             )
+            aspect_counts["Sentiment"] = aspect_counts["Sentiment"].str.title()
 
             fig_aspect = px.bar(
                 aspect_counts,
@@ -455,50 +492,145 @@ with tab_insights:
                 barmode="stack",
                 title="Aspect-Based Sentiment",
                 color_discrete_map={
-                    "positive": "#22c55e",
-                    "neutral": "#94a3b8",
-                    "negative": "#ef4444",
+                    "Positive": "#22c55e",
+                    "Neutral": "#94a3b8",
+                    "Negative": "#ef4444",
                 },
             )
-            st.plotly_chart(fig_aspect, width="stretch")
+            st.plotly_chart(theme_fig(fig_aspect), width="stretch")
         else:
             st.info("No aspect keywords detected in this sample.")
 
     st.subheader("🧾 Executive Summary")
+    from xml.sax.saxutils import escape
+    st.markdown(
+        f'<div class="summary-card">{escape(summary)}</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("🚨 Crisis & Action Alert")
+    alert_class = {
+        "critical": "alert-critical",
+        "warning": "alert-warning",
+        "monitor": "alert-monitor",
+    }.get(risk["level"], "alert-healthy")
+
     st.markdown(
         f"""
-        <div style="
-            padding: 16px;
-            border-radius: 12px;
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            white-space: pre-wrap;
-            font-size: 15px;
-        ">
-        {summary}
+        <div class="{alert_class}">
+            <div style="font-size: 1.5rem; margin-bottom: 8px;">{risk['emoji']} {risk['label']}</div>
+            <div style="font-weight: normal; opacity: 0.9;">{risk['action']}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.subheader("🚨 Crisis & Action Alert")
 
-if risk['level'] == 'critical':
-    alert_class = "alert-critical"
-elif risk['level'] == 'warning':
-    alert_class = "alert-warning"
-else:
-    alert_class = "alert-healthy"
+with tab_vote:
+    st.subheader("🗳️ Social Ballot — Har Comment Ek Vote")
+    poll_q = st.text_input("Poll Question / Proposal",
+                           value="Should this proposal / campaign be accepted?")
+    dedupe = st.checkbox("Remove duplicate / bot ballots before counting", value=True)
 
-st.markdown(
-    f"""
-    <div class="{alert_class}">
-        <div style="font-size: 1.5rem; margin-bottom: 8px;">{risk['emoji']} {risk['label']}</div>
-        <div style="font-weight: normal; opacity: 0.9;">{risk['action']}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    ballot = compute_social_ballot(df, dedupe=dedupe)
+
+    b1, b2, b3, b4, b5 = st.columns(5)
+    b1.metric("✅ FOR Votes", ballot["for"])
+    b2.metric("❌ AGAINST Votes", ballot["against"])
+    b3.metric("😐 ABSTAIN", ballot["abstain"])
+    b4.metric("🚫 Invalid Ballots (Toxic)", ballot["invalid"])
+    b5.metric("🛡️ Vote Integrity", f"{ballot['integrity']:.0f}/100")
+
+    t1, t2 = st.columns(2)
+    t1.metric("Decided Turnout", f"{ballot['turnout']:.1f}%")
+    t2.metric("Winning Margin", f"{ballot['margin']:.1f}%")
+
+    if ballot["integrity"] < 50:
+        v_class = "alert-critical"
+        v_text = f"⚠️ RESULT UNRELIABLE — manipulation suspected (integrity {ballot['integrity']:.0f}/100)"
+    elif ballot["verdict"].startswith("TIE"):
+        v_class = "alert-monitor"
+        v_text = "🤝 TIE — No clear mandate"
+    elif ballot["leader"] == "FOR":
+        v_class = "alert-healthy"
+        v_text = f"✅ VERDICT: FOR WINS by {ballot['margin']:.1f}% margin"
+    elif ballot["leader"] == "AGAINST":
+        v_class = "alert-critical"
+        v_text = f"❌ VERDICT: AGAINST WINS by {ballot['margin']:.1f}% margin"
+    else:
+        v_class = "alert-monitor"
+        v_text = "No valid votes yet"
+
+    st.markdown(
+        f'<div class="{v_class}"><div style="font-size:1.4rem;">{v_text}</div>'
+        f'<div style="font-weight:normal;opacity:.9;">Poll: {poll_q}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        vote_df = pd.DataFrame({
+            "Vote": ["FOR", "AGAINST", "ABSTAIN"],
+            "Count": [ballot["for"], ballot["against"], ballot["abstain"]],
+        })
+        fig_vote = px.pie(
+            vote_df, names="Vote", values="Count", title="Vote Distribution",
+            color="Vote",
+            color_discrete_map={"FOR": "#22c55e", "AGAINST": "#ef4444", "ABSTAIN": "#94a3b8"},
+        )
+        st.plotly_chart(theme_fig(fig_vote), width="stretch")
+    with c2:
+        if ballot["duplicates"]:
+            st.markdown("**🕵️ Ballot Stuffing Evidence (duplicate ballots):**")
+            dup_df = pd.DataFrame(
+                [{"Text": (t[:80] + "…" if len(t) > 80 else t), "Copies": c}
+                 for t, c in ballot["duplicates"].items()]
+            ).sort_values("Copies", ascending=False).head(10)
+            st.dataframe(dup_df, width="stretch", hide_index=True)
+        else:
+            st.success("No duplicate ballots detected — vote pool clean.")
+
+    st.divider()
+    st.subheader("🧍 In-App Manual Voting (Double-Vote Protected)")
+    with st.form("manual_vote_form"):
+        mv1, mv2 = st.columns(2)
+        with mv1:
+            voter_id = st.text_input("Voter ID / Email")
+        with mv2:
+            choice = st.radio("Your Vote", ["FOR", "AGAINST", "ABSTAIN"], horizontal=True)
+        submitted = st.form_submit_button("Cast Vote 🔒")
+        if submitted:
+            if not voter_id.strip():
+                st.error("Voter ID zaroori hai.")
+            else:
+                ok, msg = cast_vote(voter_id, choice)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.warning(msg)
+
+    manual = load_poll_votes()
+    if manual["votes"]:
+        mcounts = pd.Series([v["choice"] for v in manual["votes"].values()]).value_counts()
+        st.markdown(f"**Manual votes recorded:** {len(manual['votes'])} — "
+                    + ", ".join(f"{k}: {v}" for k, v in mcounts.items()))
+    else:
+        st.caption("Abhi tak koi manual vote nahi.")
+
+    result_payload = {
+        "poll_question": poll_q,
+        "social_ballot": ballot,
+        "manual_votes": len(manual["votes"]),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    st.download_button(
+        "⬇️ Download Voting Result (JSON)",
+        data=json.dumps(result_payload, indent=2, default=str).encode("utf-8"),
+        file_name="voting_result.json",
+        mime="application/json",
+        width="stretch",
+    )
+
 
 # -----------------------------
 # Comment Explorer tab
