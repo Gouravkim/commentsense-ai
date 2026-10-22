@@ -18,7 +18,6 @@ from src.report import export_csv, export_json, export_pdf_report
 from src.summary import generate_executive_summary
 from src.voting import compute_social_ballot, cast_vote, load_poll_votes
 
-import streamlit as st
 def theme_fig(fig, height=380):
     """FIX #5 & #6: dark-theme aware + uniform height charts."""
     fig.update_layout(
@@ -46,7 +45,6 @@ st.markdown("""
     [data-testid="stMetric"] {
         background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
         backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(255,255,255,0.15);
         border-radius: 16px;
         padding: 18px 15px;
@@ -58,8 +56,6 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.3);
     }
     [data-testid="stMetricLabel"] { font-size: 0.85rem !important; font-weight: 600 !important; opacity: 0.85; }
-
-    /* FIX #1 & #9: truncation hatao */
     [data-testid="stMetricValue"] {
         font-size: 1.55rem !important;
         font-weight: 800 !important;
@@ -68,7 +64,6 @@ st.markdown("""
         white-space: normal !important;
     }
 
-    /* FIX #3: Summary dark-glass card (white-on-white khatam) */
     .summary-card {
         background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
         backdrop-filter: blur(12px);
@@ -82,7 +77,6 @@ st.markdown("""
         box-shadow: 0 8px 32px 0 rgba(0,0,0,0.2);
     }
 
-    /* FIX #4: charon alert levels ke alag colors */
     .alert-critical { padding: 20px; border-radius: 12px; color: #fff; font-weight: 600;
         background: linear-gradient(90deg, #ff416c, #ff4b2b);
         box-shadow: 0 4px 18px rgba(255,75,43,0.4); margin-bottom: 20px; border-left: 5px solid #fff; }
@@ -96,50 +90,51 @@ st.markdown("""
         background: linear-gradient(90deg, #11998e, #38ef7d);
         box-shadow: 0 4px 18px rgba(56,239,125,0.3); margin-bottom: 20px; border-left: 5px solid #fff; }
 
+    /* Safe Hiding - Only hide menu and footer, NOT the header */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
-
+    
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] { padding: 10px 24px; border-radius: 8px 8px 0 0; background-color: rgba(255,255,255,0.05); }
+
 </style>
 """, unsafe_allow_html=True)
 
-# ... (baaki ka tera purana code jaisa hai waisa hi rehne de) ...
-
-# -----------------------------
-# Sidebar settings
-# -----------------------------
+# ========== SIDEBAR SETTINGS ==========
 with st.sidebar:
     st.header("⚙️ Settings")
 
-    amount = st.slider("Comments to fetch", min_value=20, max_value=300, value=100, step=20)
-    max_analyze = st.slider("Max comments to analyze (speed vs coverage)",
-                            min_value=50, max_value=500, value=150, step=50,
-                            help="Fetch jitna chaaho utna karo, par analysis isi limit tak — demo fast rahega.")
-    allow_fallback = st.checkbox("Auto fallback to demo data", value=True)
-    demo_dataset = st.selectbox(
-        "Demo dataset",
-        options=[
-            "demo_mixed.csv",
-            "demo_healthy.csv",
-            "demo_crisis.csv",
-            "demo_hinglish.csv",
-        ],
+    amount = st.slider("Comments to Fetch", min_value=50, max_value=1000, value=1000, step=50)
+
+    max_analyze = st.slider(
+        "Max Comments to Analyze (Speed vs Coverage)",
+        min_value=50, max_value=500, value=500, step=50,
+        help="Fetch as many as you want, but analysis is limited to this count to keep the demo fast.",
     )
+
+    allow_fallback = st.checkbox("Auto Fallback to Demo Data", value=True)
+
+    demo_dataset = st.selectbox(
+        "Demo Dataset",
+        options=["demo_mixed.csv", "demo_healthy.csv", "demo_crisis.csv", "demo_hinglish.csv"],
+    )
+
     fast_mode = st.checkbox(
-        "Fast rule-based mode",
+        "Fast Rule-Based Mode",
         value=False,
         help="Use this if Hugging Face model download is slow or unavailable.",
     )
 
-    if st.button("Clear cache"):
+    if st.button("Clear Cache"):
         clear_cache()
         st.success("Cache cleared.")
 
+# Main App Code Starts Here
+
 # -----------------------------
-# Session defaults
+# Sidebar settings
 # -----------------------------
+
 if "df" not in st.session_state:
     st.session_state["df"] = pd.DataFrame()
 
@@ -152,8 +147,6 @@ if "metadata" not in st.session_state:
 if "analyzed_at" not in st.session_state:
     st.session_state["analyzed_at"] = None
 
-if "last_csv_id" not in st.session_state:
-    st.session_state["last_csv_id"] = None
 
 
 def store_and_analyze(comments: list, source: str, metadata: dict | None = None) -> None:
@@ -185,7 +178,7 @@ def store_and_analyze(comments: list, source: str, metadata: dict | None = None)
 # -----------------------------
 st.title("🗳️ AI-Based Social Voting System")
 st.caption("Powered by CommentSense AI engine — sentiment • toxicity • emotion • aspects")
-st.caption("Public social comments ko AI-powered FOR / AGAINST / ABSTAIN votes mein convert karke transparent, manipulation-proof voting results nikalne wala intelligent system.")
+st.caption("An intelligent system that converts public social comments into AI-powered FOR / AGAINST / ABSTAIN votes to produce transparent, manipulation-proof voting results.")
 
 # -----------------------------
 # Inputs
@@ -203,10 +196,7 @@ with col_btn:
     st.write("")
     analyze_url_btn = st.button("Analyze URL", type="primary", width="stretch")
 
-col_csv, col_demo, col_reset = st.columns([3, 1, 1])
-
-with col_csv:
-    csv_file = st.file_uploader("Upload CSV", type=["csv"])
+col_demo, col_reset = st.columns([1, 1])
 
 with col_demo:
     st.write("")
@@ -272,18 +262,10 @@ if demo_btn:
     comments = load_demo(demo_dataset)
     store_and_analyze(comments, "demo", {"dataset": demo_dataset})
 
-if csv_file is not None:
-    file_id = (csv_file.name, getattr(csv_file, "size", None))
-    if st.session_state.get("last_csv_id") != file_id:
-        st.session_state["last_csv_id"] = file_id
-        try:
-            comments = get_comments_from_csv_file(csv_file)
-            store_and_analyze(comments, "csv", {"filename": csv_file.name})
-        except Exception as exc:
-            st.error(f"CSV upload failed: {exc}")
+
 
 if reset_btn:
-    for key in ["df", "source", "metadata", "analyzed_at", "last_csv_id"]:
+    for key in ["df", "source", "metadata", "analyzed_at"]:
         st.session_state.pop(key, None)
     st.rerun()
 
@@ -501,7 +483,7 @@ with tab_insights:
         else:
             st.info("No aspect keywords detected in this sample.")
 
-    st.subheader("🧾 Executive Summary")
+    st.subheader(" Executive Summary")
     from xml.sax.saxutils import escape
     st.markdown(
         f'<div class="summary-card">{escape(summary)}</div>',
@@ -527,7 +509,7 @@ with tab_insights:
 
 
 with tab_vote:
-    st.subheader("🗳️ Social Ballot — Har Comment Ek Vote")
+    st.subheader("🗳️ Social Ballot — Every Comment is a Vote")
     poll_q = st.text_input("Poll Question / Proposal",
                            value="Should this proposal / campaign be accepted?")
     dedupe = st.checkbox("Remove duplicate / bot ballots before counting", value=True)
@@ -601,7 +583,7 @@ with tab_vote:
         submitted = st.form_submit_button("Cast Vote 🔒")
         if submitted:
             if not voter_id.strip():
-                st.error("Voter ID zaroori hai.")
+                st.error("Voter ID is required.")
             else:
                 ok, msg = cast_vote(voter_id, choice)
                 if ok:
@@ -615,7 +597,7 @@ with tab_vote:
         st.markdown(f"**Manual votes recorded:** {len(manual['votes'])} — "
                     + ", ".join(f"{k}: {v}" for k, v in mcounts.items()))
     else:
-        st.caption("Abhi tak koi manual vote nahi.")
+        st.caption("No manual votes recorded yet.")
 
     result_payload = {
         "poll_question": poll_q,
@@ -732,7 +714,7 @@ with tab_report:
 
     with c1:
         st.download_button(
-            label="⬇️ Download CSV",
+            label="️ Download CSV",
             data=export_csv(df),
             file_name=f"{file_stem}_{stamp}_analysis.csv",
             mime="text/csv",
