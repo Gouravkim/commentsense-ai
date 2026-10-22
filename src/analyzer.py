@@ -233,6 +233,13 @@ def _cache_key(texts: list[str], use_transformers: bool) -> str:
 
 
 def analyze_comments(records, use_transformers: bool = True, progress_cb=None) -> pd.DataFrame:
+    print(f"[analyzer] START: {len(records)} records, use_transformers={use_transformers}")  # <-- ADD THIS
+    
+    if not records:
+        return pd.DataFrame(columns=EMPTY_COLUMNS)
+    
+    print("[analyzer] Preparing texts...")  # <-- ADD THIS
+    prepared = []
     """
     Batch + PARALLEL models + chunked progress + disk cache.
     progress_cb(fraction 0-1, message) optional.
@@ -277,7 +284,9 @@ def analyze_comments(records, use_transformers: bool = True, progress_cb=None) -
         except Exception:
             pass
 
+        print("[analyzer] Loading models...")  # <-- ADD THIS
     models = _load_models(use_transformers=use_transformers)
+    print(f"[analyzer] Models loaded: {models is not None}")  # <-- ADD THISmodels = _load_models(use_transformers=use_transformers)
     rows: list[dict] = []
     total = len(texts)
     done = 0

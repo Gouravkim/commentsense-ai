@@ -3,3 +3,12 @@ fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
+
+# ✨ NEW: Force Dark Mode for Premium Look ✨
+[theme]
+base = "dark"
+primaryColor = "#FF4B2B"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#262730"
+textColor = "#FAFAFA"
+font = "sans serif"

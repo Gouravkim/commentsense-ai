@@ -16,12 +16,94 @@ from src.providers import load_demo
 from src.report import export_csv, export_json, export_pdf_report
 from src.summary import generate_executive_summary
 
+import streamlit as st
+def theme_fig(fig, height=380):
+    """FIX #5 & #6: dark-theme aware + uniform height charts."""
+    fig.update_layout(
+        height=height,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"color": "#FAFAFA", "size": 13},
+        legend={"font": {"color": "#FAFAFA"}},
+        margin={"t": 50, "b": 40, "l": 40, "r": 20},
+    )
+    return fig
 st.set_page_config(
     page_title="CommentSense AI",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ✨ PREMIUM UI CSS INJECTION ✨
+st.markdown("""
+<style>
+    .stApp { font-family: 'Inter', 'Segoe UI', sans-serif; }
+
+    /* Glass metric cards */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 16px;
+        padding: 18px 15px;
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-5px);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    [data-testid="stMetricLabel"] { font-size: 0.85rem !important; font-weight: 600 !important; opacity: 0.85; }
+
+    /* FIX #1 & #9: truncation hatao */
+    [data-testid="stMetricValue"] {
+        font-size: 1.55rem !important;
+        font-weight: 800 !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+    }
+
+    /* FIX #3: Summary dark-glass card (white-on-white khatam) */
+    .summary-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: #FAFAFA;
+        white-space: pre-wrap;
+        font-size: 0.98rem;
+        line-height: 1.8;
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.2);
+    }
+
+    /* FIX #4: charon alert levels ke alag colors */
+    .alert-critical { padding: 20px; border-radius: 12px; color: #fff; font-weight: 600;
+        background: linear-gradient(90deg, #ff416c, #ff4b2b);
+        box-shadow: 0 4px 18px rgba(255,75,43,0.4); margin-bottom: 20px; border-left: 5px solid #fff; }
+    .alert-warning  { padding: 20px; border-radius: 12px; color: #fff; font-weight: 600;
+        background: linear-gradient(90deg, #f7971e, #f5533d);
+        box-shadow: 0 4px 18px rgba(245,83,61,0.35); margin-bottom: 20px; border-left: 5px solid #fff; }
+    .alert-monitor  { padding: 20px; border-radius: 12px; color: #1f2937; font-weight: 600;
+        background: linear-gradient(90deg, #ffd200, #f7971e);
+        box-shadow: 0 4px 18px rgba(247,151,30,0.35); margin-bottom: 20px; border-left: 5px solid #fff; }
+    .alert-healthy  { padding: 20px; border-radius: 12px; color: #fff; font-weight: 600;
+        background: linear-gradient(90deg, #11998e, #38ef7d);
+        box-shadow: 0 4px 18px rgba(56,239,125,0.3); margin-bottom: 20px; border-left: 5px solid #fff; }
+
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 24px; border-radius: 8px 8px 0 0; background-color: rgba(255,255,255,0.05); }
+</style>
+""", unsafe_allow_html=True)
+
+# ... (baaki ka tera purana code jaisa hai waisa hi rehne de) ...
 
 # -----------------------------
 # Sidebar settings
@@ -78,14 +160,17 @@ def store_and_analyze(comments: list, source: str, metadata: dict | None = None)
         return
 
     sample = comments[:max_analyze] if len(comments) > max_analyze else comments
-    bar = st.progress(0.0, text=f"Analyzing 0/{len(sample)} comments...")
+    progress_text = st.empty()
+    progress_text.text(f"Analyzing 0/{len(sample)} comments...")
+    
     def _cb(frac, msg=""):
         try:
-            bar.progress(min(1.0, float(frac)), text=msg or f"Analyzing... {int(frac*100)}%")
+            progress_text.text(msg or f"Analyzing {int(frac*100)}%...")
         except Exception:
             pass
+    
     df = analyze_comments(sample, use_transformers=not fast_mode, progress_cb=_cb)
-    bar.progress(1.0, text="Analysis complete ✅")
+    progress_text.empty()
 
     st.session_state["df"] = df
     st.session_state["source"] = source
@@ -231,13 +316,18 @@ else:
 # Metric cards
 m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
 m1.metric("Total Comments", f"{len(df)}")
-m2.metric("Brand Health", f"{health}/100")
+m2.metric("Brand Health (/100)", f"{health:.0f}")
 m3.metric("Positive", f"{positive_pct:.1f}%")
 m4.metric("Neutral", f"{neutral_pct:.1f}%")
 m5.metric("Negative", f"{negative_pct:.1f}%")
 m6.metric("Toxic", f"{toxic_pct:.1f}%")
 m7.metric("Top Emotion", str(top_emotion).title())
 
+if len(df) < 30:
+    st.warning(
+        f"⚠️ Low sample size: sirf {len(df)} comments mile. "
+        "Insights ki statistical confidence kam hogi — fetch amount badhao ya koi active post try karo."
+    )
 st.markdown(f"### Risk Status: {risk['emoji']} {risk['label']}")
 st.caption(risk["reason"])
 
@@ -391,21 +481,24 @@ with tab_insights:
         unsafe_allow_html=True,
     )
 
-    st.subheader("🚨 Crisis Alert")
-    st.markdown(
-        f"""
-        <div style="
-            padding: 16px;
-            border-radius: 12px;
-            background-color: {'#fee2e2' if risk['level'] in {'critical','warning'} else '#fef9c3' if risk['level'] == 'monitor' else '#dcfce7'};
-            border: 1px solid {'#fecaca' if risk['level'] in {'critical','warning'} else '#fde68a' if risk['level'] == 'monitor' else '#bbf7d0'};
-        ">
-        <b>{risk['emoji']} {risk['label']}</b><br/>
-        {risk['action']}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.subheader("🚨 Crisis & Action Alert")
+
+if risk['level'] == 'critical':
+    alert_class = "alert-critical"
+elif risk['level'] == 'warning':
+    alert_class = "alert-warning"
+else:
+    alert_class = "alert-healthy"
+
+st.markdown(
+    f"""
+    <div class="{alert_class}">
+        <div style="font-size: 1.5rem; margin-bottom: 8px;">{risk['emoji']} {risk['label']}</div>
+        <div style="font-weight: normal; opacity: 0.9;">{risk['action']}</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # -----------------------------
 # Comment Explorer tab
